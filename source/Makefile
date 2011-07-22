@@ -6,7 +6,7 @@ all:
 	(cd fmusim; make fmusim)
 
 %.o: %.c
-	$(CC) -c -fPIC $(CFLAGS) $< -o $@
+	$(CC) -Wall -c -fPIC $(CFLAGS) $< -o $@
 
 %.so: %.o
 	$(CC) -shared -Wl,-soname,$@ -o $@ $<

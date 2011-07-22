@@ -27,6 +27,7 @@ void outputRow(FMU *fmu, fmiComponent c, double time, FILE* file, char separator
     ScalarVariable** vars = fmu->modelDescription->modelVariables;
     char buffer[32];
     
+    if(!file) return;
     // print first column
     if (header) 
         fprintf(file, "time"); 
@@ -73,6 +74,9 @@ void outputRow(FMU *fmu, fmiComponent c, double time, FILE* file, char separator
                 case elm_String:
                     fmu->getString(c, &vr, 1, &s);
                     fprintf(file, "%c%s", separator, s);
+                    break;
+                default:
+                    // skip non-essential elements
                     break;
             }
         }
@@ -130,7 +134,7 @@ static void replaceRefsInMessage(const char* msg, char* buffer, int nBuffer, FMU
         else {
             char* end = strchr(msg+i+1, '#');
             if (!end) {
-                printf("unmatched '#' in '%s'\n", msg);
+                fprintf(stderr,"unmatched '#' in '%s'\n", msg);
                 buffer[k++]='#';
                 break;
             }
@@ -156,7 +160,7 @@ static void replaceRefsInMessage(const char* msg, char* buffer, int nBuffer, FMU
                 }
                 else {
                     // could not parse the number
-                    printf("illegal value reference at position %d in '%s'\n", i+2, msg);
+                    fprintf(stderr,"illegal value reference at position %d in '%s'\n", i+2, msg);
                     buffer[k++]='#';
                     break;
                 }
@@ -186,10 +190,10 @@ void fmuLogger(fmiComponent c, fmiString instanceName,
     // print the final message
     if (!instanceName) instanceName = "?";
     if (!category) category = "?";
-    printf("%s %s (%s): %s\n", fmiStatusToString(status), instanceName, category, msg);
+    fprintf(stderr,"%s %s (%s): %s\n", fmiStatusToString(status), instanceName, category, msg);
 }
 
 int fmuError(const char* message){
-    printf("%s\n", message);
+    fprintf(stderr,"%s\n", message);
     return 0;
 }

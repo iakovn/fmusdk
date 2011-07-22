@@ -58,18 +58,18 @@ int fmuUnzip(const char *zipPath, const char *outPath) {
     // run the unzip command
     // remove "> NUL" to see the unzip protocol
     sprintf(cmd, "%s%s \"%s\" > NUL", UNZIP_CMD, outPath, zipPath); 
-    // printf("cmd='%s'\n", cmd);
+    // fprintf(stderr,"cmd='%s'\n", cmd);
     code = system(cmd);
     free(cmd);
     if (code!=SEVEN_ZIP_NO_ERROR) {
         switch (code) {
-            printf("7z: ");
-            case SEVEN_ZIP_WARNING:            printf("warning\n"); break;
-            case SEVEN_ZIP_ERROR:              printf("error\n"); break;
-            case SEVEN_ZIP_COMMAND_LINE_ERROR: printf("command line error\n"); break;
-            case SEVEN_ZIP_OUT_OF_MEMORY:      printf("out of memory\n"); break;
-            case SEVEN_ZIP_STOPPED_BY_USER:    printf("stopped by user\n"); break;
-            default: printf("unknown problem\n");
+            fprintf(stderr,"7z: ");
+            case SEVEN_ZIP_WARNING:            fprintf(stderr,"warning\n"); break;
+            case SEVEN_ZIP_ERROR:              fprintf(stderr,"error\n"); break;
+            case SEVEN_ZIP_COMMAND_LINE_ERROR: fprintf(stderr,"command line error\n"); break;
+            case SEVEN_ZIP_OUT_OF_MEMORY:      fprintf(stderr,"out of memory\n"); break;
+            case SEVEN_ZIP_STOPPED_BY_USER:    fprintf(stderr,"stopped by user\n"); break;
+            default: fprintf(stderr,"unknown problem\n");
         }
     }
     
@@ -96,7 +96,7 @@ int fmuUnzip(const char *zipPath, const char *outPath) {
     // change to %FMUSDK_HOME%\bin to find 7z.dll and 7z.exe
     if (FMUSDK_HOME==NULL) {
       printf ("warning: Could not get value of FMUSDK_HOME, assuming 7zip is in your path.\n");
-      FMUSDK_HOME = strdup("");
+      FMUSDK_HOME = "";
     } else {
 #if WINDOWS
         strcat(binPath, "\\bin");
@@ -120,18 +120,18 @@ int fmuUnzip(const char *zipPath, const char *outPath) {
     cmd = (char*)calloc(sizeof(char), n);
     sprintf(cmd, "%s%s \"%s\" > /dev/null", UNZIP_CMD, outPath, zipPath); 
 #endif
-    printf("cmd='%s'\n", cmd);
+    fprintf(stderr,"cmd='%s'\n", cmd);
     code = system(cmd);
     free(cmd);
     if (code!=SEVEN_ZIP_NO_ERROR) {
         switch (code) {
-            printf("7z: ");
-            case SEVEN_ZIP_WARNING:            printf("warning\n"); break;
-            case SEVEN_ZIP_ERROR:              printf("error\n"); break;
-            case SEVEN_ZIP_COMMAND_LINE_ERROR: printf("command line error\n"); break;
-            case SEVEN_ZIP_OUT_OF_MEMORY:      printf("out of memory\n"); break;
-            case SEVEN_ZIP_STOPPED_BY_USER:    printf("stopped by user\n"); break;
-            default: printf("unknown problem\n");
+            fprintf(stderr,"7z: ");
+            case SEVEN_ZIP_WARNING:            fprintf(stderr,"warning\n"); break;
+            case SEVEN_ZIP_ERROR:              fprintf(stderr,"error\n"); break;
+            case SEVEN_ZIP_COMMAND_LINE_ERROR: fprintf(stderr,"command line error\n"); break;
+            case SEVEN_ZIP_OUT_OF_MEMORY:      fprintf(stderr,"out of memory\n"); break;
+            case SEVEN_ZIP_STOPPED_BY_USER:    fprintf(stderr,"stopped by user\n"); break;
+            default: fprintf(stderr,"unknown problem\n");
         }
     }
     

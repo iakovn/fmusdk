@@ -23,6 +23,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+
+#include "fmuzip.h"
+#include "fmuinit.h"
+#include "fmusim.h"
 #include "main.h"
 
 #ifndef _MSC_VER
@@ -71,75 +75,83 @@ static char* getFmuPath(const char* fmuFileName){
   return strdup(fmuFileName);
 }
 static char* getTmpPath() {
-  char *tmp = mkdtemp(strdup("fmuTmpXXXXXX"));
-  if (tmp==NULL) {
+  char tmpPath[BUFSIZE];
+  strcpy(tmpPath, "fmuTmpXXXXXX");
+  if (mkdtemp(tmpPath) == NULL ) {
     fprintf(stderr, "Couldn't create temporary directory\n");
     exit(1);
   }
-  /* return strdup(tmp); */
-  return strcat(tmp, "/");
+  strcat(tmpPath, "/");
+  return strdup(tmpPath);
 }
 #endif
 
 static void printHelp(const char* fmusim) {
-    printf("command syntax: %s <model.fmu> <tEnd> <h> <loggingOn> <csv separator>\n", fmusim);
-    printf("   <model.fmu> .... path to FMU, relative to current dir or absolute, required\n");
-    printf("   <tEnd> ......... end  time of simulation, optional, defaults to 1.0 sec\n");
-    printf("   <h> ............ step size of simulation, optional, defaults to 0.1 sec\n");
-    printf("   <loggingOn> .... 1 to activate logging,   optional, defaults to 0\n");
-    printf("   <csv separator>. column separator char in csv file, optional, defaults to ';'\n");
+    fprintf(stderr,"command syntax: %s <model.fmu> <tEnd> <h> <loggingOn> <csv separator> <results_file>\n", fmusim);
+    fprintf(stderr,"   <model.fmu> .... path to FMU, relative to current dir or absolute, required\n");
+    fprintf(stderr,"   <tEnd> ......... end  time of simulation, optional, defaults to 1.0 sec\n");
+    fprintf(stderr,"   <h> ............ step size of simulation, optional, defaults to 0.1 sec\n");
+    fprintf(stderr,"   <loggingOn> .... 1 to activate logging,optional, defaults to 0 - no logging\n");
+    fprintf(stderr,"   <csv separator>. column separator char in csv file, optional, defaults to ';'\n");
+    fprintf(stderr,"   <results_file>.. results file name, optional, defaults to standard output. Empty string for no output (for accurate timing).\n");
 }
 
 int main(int argc, char *argv[]) {
-    const char* fmuFileName;
-    char* fmuPath;
-    char* tmpPath;
-    char* xmlPath;
-    char* dllPath;
-    char* cmd;
+    const char* fmuFileName = 0;
+    char* fmuPath = 0;
+    char* tmpPath = 0;
+    char* xmlPath = 0;
+    char* dllPath = 0;
+    char* cmd = 0;
     
     // define default argument values
     double tEnd = 1.0;
     double h=0.1;
     int loggingOn = 0;
     char csv_separator = ';';
+    const char* resultFileName = "-";
 
     // parse command line arguments
     if (argc>1) {
         fmuFileName = argv[1];
     }
     else {
-        printf("error: no fmu file\n");
+        fprintf(stderr,"error: no fmu file\n");
         printHelp(argv[0]);
         exit(EXIT_FAILURE);
     }
     if (argc>2) {
         if (sscanf(argv[2],"%lf", &tEnd) != 1) {
-            printf("error: The given end time (%s) is not a number\n", argv[2]);
+            fprintf(stderr,"error: The given end time (%s) is not a number\n", argv[2]);
             exit(EXIT_FAILURE);
         }
     }
     if (argc>3) {
         if (sscanf(argv[3],"%lf", &h) != 1) {
-            printf("error: The given stepsize (%s) is not a number\n", argv[3]);
+            fprintf(stderr,"error: The given stepsize (%s) is not a number\n", argv[3]);
             exit(EXIT_FAILURE);
         }
     }
     if (argc>4) {
         if (sscanf(argv[4],"%d", &loggingOn) != 1 || loggingOn<0 || loggingOn>1) {
-            printf("error: The given logging flag (%s) is not boolean\n", argv[4]);
+            fprintf(stderr,"error: The given logging option (%s) must be 0 or 1\n", argv[4]);
             exit(EXIT_FAILURE);
         }
     }
     if (argc>5) {
         if (strlen(argv[5]) != 1) {
-            printf("error: The given CSV separator char (%s) is not valid\n", argv[5]);
+            fprintf(stderr,"error: The given CSV separator char (%s) is not valid\n", argv[5]);
             exit(EXIT_FAILURE);
         }
         csv_separator = argv[5][0];
     }
     if (argc>6) {
-        printf("warning: Ignoring %d additional arguments: %s ...\n", argc-6, argv[6]);
+        resultFileName = argv[6];
+        if(strlen(resultFileName)==0) resultFileName = 0; // no output
+    }
+
+    if (argc>7) {
+        fprintf(stderr,"warning: Ignoring %d additional arguments: %s ...\n", argc-6, argv[6]);
         printHelp(argv[0]);
     }
 
@@ -167,17 +179,31 @@ int main(int argc, char *argv[]) {
     free(fmuPath);
 
     // run the simulation
-    printf("FMU Simulator: run '%s' from t=0..%g with step size h=%g, loggingOn=%d, csv separator='%c'\n", 
+    fprintf(stderr,"FMU Simulator: run '%s' from t=0..%g with step size h=%g, loggingOn=%d, csv separator='%c'\n", 
             fmuFileName, tEnd, h, loggingOn, csv_separator);
-    fmuSimulate(&fmu, tEnd, h, loggingOn, csv_separator);
+    if(resultFileName)
+        if(strlen(resultFileName)==1 && resultFileName[0]=='-')
+            fprintf(stderr, "Output will be written to standard output\n");
+        else
+            fprintf(stderr, "Output will be written to file %s\n", resultFileName);
+    else
+        fprintf(stderr, "No output file will be produced\n");
+
+    fmuSimulate(&fmu, tEnd, h, loggingOn, csv_separator, resultFileName);
 
 #if WINDOWS
-    /* Remove temp file directory? */
+    /* Remove temp file directory? Not tested*/
+    cmd = calloc(sizeof(char), strlen(tmpPath)+20);
+    sprintf(cmd, "rmdir %s /s /q", tmpPath);
+    fprintf(stderr,"Removing %s\n", tmpPath);
+    system(cmd);
+    free(cmd);
 #else
     cmd = calloc(sizeof(char), strlen(tmpPath)+8);
     sprintf(cmd, "rm -rf %s", tmpPath);
-    printf("Removing %s\n", tmpPath);
+    fprintf(stderr,"Removing %s\n", tmpPath);
     system(cmd);
+    free(cmd);
 #endif
     free(tmpPath);
 

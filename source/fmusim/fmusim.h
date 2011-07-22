@@ -11,6 +11,6 @@
 #include "main.h"
 
 int fmuSimulate(FMU* fmu, double tEnd, double h,
-		fmiBoolean loggingOn, char separator);
+                fmiBoolean loggingOn, char separator, const char* resultFileName);
 
 #endif // fmusim_h

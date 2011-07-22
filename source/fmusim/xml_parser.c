@@ -201,8 +201,8 @@ ScalarVariable* getVariableByName(ModelDescription* md, const char* name) {
 // Real, String, Boolean define own base types.
 int sameBaseType(Elm t1, Elm t2){
     return t1==t2 || 
-           t1==elm_Enumeration && t2==elm_Integer || 
-           t2==elm_Enumeration && t1==elm_Integer;
+           (t1==elm_Enumeration && t2==elm_Integer) ||
+           (t2==elm_Enumeration && t1==elm_Integer);
 }
 
 // returns NULL if variable not found or vr==fmiUndefinedValueReference
@@ -251,7 +251,7 @@ const char * getDescription(ModelDescription* md, ScalarVariable* sv) {
 const char * getVariableAttributeString(ModelDescription* md, 
         fmiValueReference vr, Elm type, Att a){
     const char* value;
-    const char* declaredType;
+    //const char* declaredType;
     Type* tp; 
     ScalarVariable* sv = getVariable(md, vr, type);
     if (!sv) return NULL;
@@ -287,7 +287,7 @@ double getNominal(ModelDescription* md, fmiValueReference vr){
 // Returns 0 to indicate error
 static int checkPointer(const void* ptr){
     if (! ptr) {
-        printf("Out of memory\n");
+        fprintf(stderr,"Out of memory\n");
         if (parser) XML_StopParser(parser, XML_FALSE);
         return 0; // error 
     }
@@ -299,7 +299,7 @@ static int checkName(const char* name, const char* kind, const char* array[], in
     for (i=0; i<n; i++) {
         if (!strcmp(name, array[i])) return i;
     }
-    printf("Illegal %s %s\n", kind, name);
+    fprintf(stderr,"Illegal %s %s\n", kind, name);
     XML_StopParser(parser, XML_FALSE);
     return -1;
 }
@@ -320,7 +320,7 @@ static int checkEnumValue(const char* enu){
 }
 
 static void logFatalTypeError(const char* expected, Elm found) {
-    printf("Wrong element type, expected %s, found %s\n", 
+    fprintf(stderr,"Wrong element type, expected %s, found %s\n", 
             expected, elmNames[found]);
     XML_StopParser(parser, XML_FALSE);
 }
@@ -339,7 +339,7 @@ static int checkElementType(void* element, Elm e) {
 // If e==ANY_TYPE, the type check is ommited 
 static int checkPeek(Elm e) {
     if (stackIsEmpty(stack)){
-        printf("Illegal document structure, expected %s\n", elmNames[e]);
+        fprintf(stderr,"Illegal document structure, expected %s\n", elmNames[e]);
         XML_StopParser(parser, XML_FALSE);
         return 0; // error
     }
@@ -461,7 +461,8 @@ static void popList(Elm e) {
 static void XMLCALL endElement(void *context, const char *elm) {
     Elm el;
     el = checkElement(elm);
-    switch(el) {        
+    assert((el >= elm_fmiModelDescription) && (el <=elm_Enumeration));
+    switch(el) {
         case elm_fmiModelDescription: 
             {
                  ModelDescription* md;
@@ -525,7 +526,7 @@ static void XMLCALL endElement(void *context, const char *elm) {
                     case elm_BooleanType:
                     case elm_EnumerationType:
                         break;
-                    deaullt:
+                    default:
                          logFatalTypeError("RealType or similar", ts->type);
                          return;
                 }
@@ -552,7 +553,7 @@ static void XMLCALL endElement(void *context, const char *elm) {
                     case elm_Boolean:
                     case elm_Enumeration:
                         break;
-                    deault:
+                    default:
                          logFatalTypeError("Real or similar", child->type);
                          return;
                 }
@@ -583,7 +584,6 @@ static void XMLCALL endElement(void *context, const char *elm) {
                  stackPush(stack, name);
                  break;
             }
-        case -1: return; // illegal element error
         default: // must be a leaf Element
                  assert(getAstNodeType(el)==astElement);
                  break;
@@ -633,11 +633,11 @@ void printElement(int indent, void* element){
     ModelDescription* md;
     if (!e) return;
     // print attributes
-    for (i=0; i<indent; i++) printf(" ");
-    printf("%s", elmNames[e->type]);
+    for (i=0; i<indent; i++) fprintf(stderr," ");
+    fprintf(stderr,"%s", elmNames[e->type]);
     for (i=0; i<e->n; i+=2) 
-        printf(" %s=%s", e->attributes[i], e->attributes[i+1]);
-    printf("\n");
+        fprintf(stderr," %s=%s", e->attributes[i], e->attributes[i+1]);
+    fprintf(stderr,"\n");
     // print child nodes
     indent += 2;
     switch (getAstNodeType(e->type)) {
@@ -659,6 +659,10 @@ void printElement(int indent, void* element){
             printList(indent, (void **)md->vendorAnnotations);
             printList(indent, (void **)md->modelVariables);
             break;
+         case astElement:
+            break;
+         default:
+            fprintf(stderr, "Ignoring unexpected AstNodeType %d\n", getAstNodeType(e->type));
     }
 }
 
@@ -700,6 +704,10 @@ void freeElement(void* element){
             freeList((void **)md->vendorAnnotations);
             freeList((void **)md->modelVariables);
             break;
+        case astElement:
+           break;
+        default:
+           fprintf(stderr, "Ignoring unexpected AstNodeType %d\n", getAstNodeType(e->type));
     }
     // free the struct
     free(e);
@@ -739,7 +747,7 @@ ModelDescription* parse(const char* xmlPath) {
     XML_SetCharacterDataHandler(parser, handleData);
   	file = fopen(xmlPath, "rb");
 	if (file == NULL) {
-        printf("Cannot open file '%s'\n", xmlPath);
+        fprintf(stderr,"Cannot open file '%s'\n", xmlPath);
      	XML_ParserFree(parser);
         return NULL; // failure
     }
@@ -747,7 +755,7 @@ ModelDescription* parse(const char* xmlPath) {
         int n = fread(text, sizeof(char), XMLBUFSIZE, file);
 	    if (n != XMLBUFSIZE) done = 1;
         if (!XML_Parse(parser, text, n, done)){
-             printf("Parse error in file %s at line %d:\n%s\n", 
+             fprintf(stderr,"Parse error in file %s at line %d:\n%s\n", 
                      xmlPath,
                          (int)XML_GetCurrentLineNumber(parser),
 	                 XML_ErrorString(XML_GetErrorCode(parser)));

@@ -31,11 +31,11 @@ int fmuLoadDll(const char* dllPath, FMU *fmu) {
 #ifdef _MSC_VER
     HANDLE h = LoadLibrary(dllPath);
 #else
-    printf("dllPath = %s\n", dllPath);
+    fprintf(stderr, "dllPath = %s\n", dllPath);
     HANDLE h = dlopen(dllPath, RTLD_LAZY);
 #endif
     if (!h) {
-        printf("error: Could not load %s\n", dllPath);
+        fprintf(stderr,"error: Could not load %s\n", dllPath);
         return 0; // failure
     }
     fmu->dllHandle = h;

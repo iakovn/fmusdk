@@ -3,6 +3,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <time.h>
 
 #ifndef _MSC_VER
 #define TRUE 1
@@ -10,17 +12,15 @@
 #define min(a,b) (a>b ? b : a)
 #endif
 
-#define RESULT_FILE "result.csv"
-
 // simulate the given FMU using the forward euler method.
 // time events are processed by reducing step size to exactly hit tNext.
 // state events are checked and fired only at the end of an Euler step. 
 // the simulator may therefore miss state events and fires state events typically too late.
-int fmuSimulate(FMU* fmu, double tEnd, double h, fmiBoolean loggingOn, char separator) {
-    int i, n;
+int fmuSimulate(FMU* fmu, double tEnd, double h, fmiBoolean loggingOn, char separator, const char* resultFileName) {
+    int i;
     double dt, tPre;
     fmiBoolean timeEvent, stateEvent, stepEvent;
-    double time;  
+    double simtime;
     int nx;                          // number of state variables
     int nz;                          // number of state event indicators
     double *x;                       // continuous states
@@ -39,7 +39,8 @@ int fmuSimulate(FMU* fmu, double tEnd, double h, fmiBoolean loggingOn, char sepa
     int nTimeEvents = 0;
     int nStepEvents = 0;
     int nStateEvents = 0;
-    FILE* file;
+    FILE* file = 0;
+    clock_t timing;
 
     // instantiate the fmu
     md = fmu->modelDescription;
@@ -59,51 +60,62 @@ int fmuSimulate(FMU* fmu, double tEnd, double h, fmiBoolean loggingOn, char sepa
         z    =  (double *) calloc(nz, sizeof(double));
         prez =  (double *) calloc(nz, sizeof(double));
     }
-    if (!x || !xdot || nz>0 && (!z || !prez)) return fmuError("out of memory");
+    if (!x || !xdot || ((nz>0) && (!z || !prez))) return fmuError("out of memory");
 
     // open result file
-    if (!(file=fopen(RESULT_FILE, "w"))) {
-        printf("could not write %s\n", RESULT_FILE);
-        return 0; // failure
+    if(resultFileName != 0) {
+        if((strlen(resultFileName)==1) && (resultFileName[0]=='-') )
+            file = stdout;
+        else {
+            if (!(file=fopen(resultFileName, "w"))) {
+                fprintf(stderr,"could not write %s\n", resultFileName);
+                return 0; // failure
+            }
+        }
     }
-        
+
+    timing = clock();
+    fprintf(stderr,"timing start %ld\n", timing);
+
     // set the start time and initialize
-    time = t0;
+    simtime = t0;
     fmiFlag =  fmu->setTime(c, t0);
     if (fmiFlag > fmiWarning) return fmuError("could not set time");
     fmiFlag =  fmu->initialize(c, toleranceControlled, t0, &eventInfo);
     if (fmiFlag > fmiWarning)  fmuError("could not initialize model");
     if (eventInfo.terminateSimulation) {
-        printf("model requested termination at init");
-        tEnd = time;
+        fprintf(stderr,"model requested termination at init");
+        tEnd = simtime;
     }
   
-    // output solution for time t0
-    outputRow(fmu, c, t0, file, separator, TRUE);  // output column names
-    outputRow(fmu, c, t0, file, separator, FALSE); // output values
+    // output solution for simtime t0
+    if(file) {
+        outputRow(fmu, c, t0, file, separator, TRUE);  // output column names
+        outputRow(fmu, c, t0, file, separator, FALSE); // output values
+    }
 
     // enter the simulation loop
-    while (time < tEnd) {
+    while (simtime < tEnd) {
      // get current state and derivatives
      fmiFlag = fmu->getContinuousStates(c, x, nx);
      if (fmiFlag > fmiWarning) return fmuError("could not retrieve states");
      fmiFlag = fmu->getDerivatives(c, xdot, nx);
      if (fmiFlag > fmiWarning) return fmuError("could not retrieve derivatives");
 
-     // advance time
-     tPre = time;
-     time = min(time+h, tEnd);
-     timeEvent = eventInfo.upcomingTimeEvent && eventInfo.nextEventTime < time;     
-     if (timeEvent) time = eventInfo.nextEventTime;
-     dt = time - tPre; 
-     fmiFlag = fmu->setTime(c, time);
+     // advance simtime
+     tPre = simtime;
+     simtime = min(simtime+h, tEnd);
+     timeEvent = eventInfo.upcomingTimeEvent && eventInfo.nextEventTime < simtime;
+     if (timeEvent) simtime = eventInfo.nextEventTime;
+     dt = simtime - tPre;
+     fmiFlag = fmu->setTime(c, simtime);
      if (fmiFlag > fmiWarning) fmuError("could not set time");
 
      // perform one step
      for (i=0; i<nx; i++) x[i] += dt*xdot[i]; // forward Euler method
      fmiFlag = fmu->setContinuousStates(c, x, nx);
      if (fmiFlag > fmiWarning) return fmuError("could not set states");
-     if (loggingOn) printf("Step %d to t=%.16g\n", nSteps, time);
+     if (loggingOn) fprintf(stderr,"Step %d to t=%.16g\n", nSteps, simtime);
     
      // Check for step event, e.g. dynamic state selection
      fmiFlag = fmu->completedIntegratorStep(c, &stepEvent);
@@ -122,17 +134,17 @@ int fmuSimulate(FMU* fmu, double tEnd, double h, fmiBoolean loggingOn, char sepa
         
         if (timeEvent) {
             nTimeEvents++;
-            if (loggingOn) printf("time event at t=%.16g\n", time);
+            if (loggingOn) fprintf(stderr,"time event at t=%.16g\n", simtime);
         }
         if (stateEvent) {
             nStateEvents++;
             if (loggingOn) for (i=0; i<nz; i++)
-                printf("state event %s z[%d] at t=%.16g\n", 
-                        (prez[i]>0 && z[i]<0) ? "-\\-" : "-/-", i, time);
+                fprintf(stderr,"state event %s z[%d] at t=%.16g\n",
+                        (prez[i]>0 && z[i]<0) ? "-\\-" : "-/-", i, simtime);
         }
         if (stepEvent) {
             nStepEvents++;
-            if (loggingOn) printf("step event at t=%.16g\n", time);
+            if (loggingOn) fprintf(stderr,"step event at t=%.16g\n", simtime);
         }
 
         // event iteration in one step, ignoring intermediate results
@@ -141,40 +153,49 @@ int fmuSimulate(FMU* fmu, double tEnd, double h, fmiBoolean loggingOn, char sepa
         
         // terminate simulation, if requested by the model
         if (eventInfo.terminateSimulation) {
-            printf("model requested termination at t=%.16g\n", time);
+            fprintf(stderr,"model requested termination at t=%.16g\n", simtime);
             break; // success
         }
 
         // check for change of value of states
         if (eventInfo.stateValuesChanged && loggingOn) {
-            printf("state values changed at t=%.16g\n", time);
+            fprintf(stderr,"state values changed at t=%.16g\n", simtime);
         }
         
         // check for selection of new state variables
         if (eventInfo.stateValueReferencesChanged && loggingOn) {
-            printf("new state variables selected at t=%.16g\n", time);
+            fprintf(stderr,"new state variables selected at t=%.16g\n", simtime);
         }
        
      } // if event
-     outputRow(fmu, c, time, file, separator, FALSE); // output values for this step
+     if(file)
+        outputRow(fmu, c, simtime, file, separator, FALSE); // output values for this step
      nSteps++;
   } // while  
 
+  timing = clock() - timing;
+
   // cleanup
-  fclose(file);
+  fmu->freeModelInstance(c);
+  if(file)
+    fclose(file);
+
   if (x!=NULL) free(x);
   if (xdot!= NULL) free(xdot);
   if (z!= NULL) free(z);
   if (prez!= NULL) free(prez);
 
   // print simulation summary 
-  printf("Simulation from %g to %g terminated successful\n", t0, tEnd);
-  printf("  steps ............ %d\n", nSteps);
-  printf("  fixed step size .. %g\n", h);
-  printf("  time events ...... %d\n", nTimeEvents);
-  printf("  state events ..... %d\n", nStateEvents);
-  printf("  step events ...... %d\n", nStepEvents);
-  printf("CSV file '%s' written.\n", RESULT_FILE);
+  fprintf(stderr,"Simulation from %g to %g terminated successful\n", t0, tEnd);
+  fprintf(stderr,"  steps ............ %d\n", nSteps);
+  fprintf(stderr,"  fixed step size .. %g\n", h);
+  fprintf(stderr,"  time events ...... %d\n", nTimeEvents);
+  fprintf(stderr,"  state events ..... %d\n", nStateEvents);
+  fprintf(stderr,"  step events ...... %d\n", nStepEvents);
+  if(resultFileName && ((strlen(resultFileName)!=1) || (resultFileName[0] != '-')))
+        fprintf(stderr,"CSV file '%s' written.\n", resultFileName);
+  fprintf(stderr,"  simultation time.. %g seconds (resolution %g sec) \n",
+          ((double)timing * 1.0) / CLOCKS_PER_SEC, 1.0/CLOCKS_PER_SEC);
 
   return 1; // success
 }
