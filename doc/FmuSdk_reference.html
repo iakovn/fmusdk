@@ -1,13 +1,13 @@
 <html>
 <head>
-    <title>Documentation for FMU SDK 1.0</title>
+    <title>Documentation for FMU SDK 1.0.1</title>
 <style type="text/css">
   html { font-family: Verdana, Arial, Helvetica, sans-serif; }
   h1,h2,h3  { color: #000066; }
 </style>
 </head>
 <body>
-  <h1>FMU SDK 1.0</h1>
+  <h1>FMU SDK 1.0.1</h1>
   The FMU SDK is a free software development kit provided by
     <a href="http://www.qtronic.de" target="_blank">QTronic</a>.
     The FMU SDK demonstrates basic use of Functional Mockup Units (FMUs)
@@ -117,6 +117,25 @@ When done with editing the xml file and xy.c, open a command shell in FMUSDK_HOM
 and run the command <code>build_fmu xy</code>. 
 This should create the FMU file xy.fmu in directory FMUSDK_HOME\fmu.
 <hr />
+
+<h2>FMU SDK Revision history</h2>
+<ul>
+<li>07.02.2010, Version 1.0 
+    <ul>
+    <li>First release</li>
+    </ul>
+</li>
+<li>05.03.2010, Version 1.0.1 
+    <ul>
+    <li>bug-fix in fmuTemplate.c: fmiSetString now copies the passed
+       string argument and fmiFreeModelInstance frees all string copies
+    </li> 
+    <li>fmusim/main.c: removed strerror(GetLastError()) from error messages
+    </li>
+    </ul>
+</li>
+</ul>
+
 <h2><a name="license">License conditions</a></h2>
 The FMU SDK is provided by QTronic under the
 <a href="http://www.opensource.org/licenses/bsd-license.html">BSD License</a>.

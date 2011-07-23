@@ -50,8 +50,8 @@ void setStartValues(ModelInstance *comp) {
     i(int_out_) = 0;
     b(bool_in_) = fmiTrue;
     b(bool_out_) = fmiFalse;
-    s(string_in_) = "a string";
-    s(string_out_) = month[0];
+    copy(string_in_, "a string");
+    copy(string_out_, month[0]);
 }
 
 // called by fmiInitialize() after setting eventInfo to defaults
@@ -76,7 +76,7 @@ void eventUpdate(ModelInstance* comp, fmiEventInfo* eventInfo) {
     eventInfo->nextEventTime       = 1 + comp->time;
     i(int_out_) += 1;
     b(bool_out_) = !b(bool_out_);
-    if (i(int_out_)<12) s(string_out_) = month[i(int_out_)];
+    if (i(int_out_)<12) copy(string_out_, month[i(int_out_)]);
     else eventInfo->terminateSimulation = fmiTrue;
 } 
 

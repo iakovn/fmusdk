@@ -1,6 +1,12 @@
 /* ---------------------------------------------------------------------------*
  * Implementation of the FMU interface based on functions and macros to
  * be defined by the includer of this file.
+ *
+ * Revision history
+ *  07.02.2010 initial version released in FMU SDK 1.0
+ *  05.03.2010 bug fix: fmiSetString now copies the passed string argument
+ *     and fmiFreeModelInstance frees all string copies
+ *  
  * (c) 2010 QTronic GmbH 
  * ---------------------------------------------------------------------------*/
 
@@ -133,7 +139,13 @@ void fmiFreeModelInstance(fmiComponent c) {
     if (comp->r) comp->functions.freeMemory(comp->r);
     if (comp->i) comp->functions.freeMemory(comp->i);
     if (comp->b) comp->functions.freeMemory(comp->b);
-    if (comp->s) comp->functions.freeMemory(comp->s);
+    if (comp->s) {
+        int i;
+        for (i=0; i<NUMBER_OF_STRINGS; i++){
+            if (comp->s[i]) comp->functions.freeMemory(comp->s[i]);
+        }
+        comp->functions.freeMemory(comp->s);
+    }
     comp->functions.freeMemory(comp);
 }
 
@@ -206,7 +218,7 @@ fmiStatus fmiSetBoolean(fmiComponent c, const fmiValueReference vr[], size_t nvr
 }
 
 fmiStatus fmiSetString(fmiComponent c, const fmiValueReference vr[], size_t nvr, const fmiString value[]){
-    int i;
+    int i, n;
     ModelInstance* comp = (ModelInstance *)c;
     if (invalidState(comp, "fmiSetString", modelInstantiated|modelInitialized))
          return fmiError;
@@ -217,11 +229,23 @@ fmiStatus fmiSetString(fmiComponent c, const fmiValueReference vr[], size_t nvr,
     if (comp->loggingOn)
         comp->functions.logger(c, comp->instanceName, fmiOK, "log", "fmiSetString: nvr = %d",  nvr);
     for (i=0; i<nvr; i++) {
+        char* string = comp->s[vr[i]];
         if (vrOutOfRange(comp, "fmiSetString", vr[i], NUMBER_OF_STRINGS))
             return fmiError;
-       if (comp->loggingOn) comp->functions.logger(c, comp->instanceName, fmiOK, "log", 
+        if (comp->loggingOn) comp->functions.logger(c, comp->instanceName, fmiOK, "log", 
             "fmiSetString: #s%d# = '%s'", vr[i], value[i]);
-        comp->s[vr[i]] = value[i]; 
+        if (nullPointer(comp, "fmiSetString", "value[i]", value[i]))
+            return fmiError;
+        if (string==NULL || strlen(string) < strlen(value[i])) {
+            if (string) comp->functions.freeMemory(string);
+            comp->s[vr[i]] = comp->functions.allocateMemory(1+strlen(value[i]), sizeof(char));
+            if (!comp->s[vr[i]]) {
+                comp->state = modelError;
+                comp->functions.logger(NULL, comp->instanceName, fmiError, "error", "fmiSetString: Out of memory.");
+                return fmiError;
+            }
+        }
+        strcpy(comp->s[vr[i]], value[i]);
     }
     return fmiOK;
 }
