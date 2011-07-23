@@ -1,6 +1,6 @@
 all: fmusim
 
-CFLAGS = -I../include -g
+CFLAGS = -I../include -g -Wall
 OBJS = main.o fmuinit.o fmuio.o fmusim.o fmuzip.o xml_parser.o stack.o
 
 all: fmusim

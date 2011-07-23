@@ -31,17 +31,17 @@ int fmuUnzip(const char *zipPath, const char *outPath) {
 
     // remember current directory
     if (!GetCurrentDirectory(BUFSIZE, cwd)) {
-        printf ("error: Could not get current directory: %s\n", strerror(GetLastError()));
+        printf ("error: Could not get current directory\n");
         return 0; // error
     }
         
     // change to %FMUSDK_HOME%\bin to find 7z.dll and 7z.exe
     if (!GetEnvironmentVariable("FMUSDK_HOME", binPath, BUFSIZE)) {
         if (GetLastError() == ERROR_ENVVAR_NOT_FOUND) {
-            printf ("error: Environment variable FMUSDK_HOME not defined.\n");
+            printf ("error: Environment variable FMUSDK_HOME not defined\n");
         }
         else {
-            printf ("error: Could not get value of FMUSDK_HOME: %s\n",strerror(GetLastError()));
+            printf ("error: Could not get value of FMUSDK_HOME\n");
         }
         return 0; // error       
     }
@@ -51,8 +51,8 @@ int fmuUnzip(const char *zipPath, const char *outPath) {
     strcat(binPath, "/bin");
 #endif
     if (!SetCurrentDirectory(binPath)) {
-        printf ("error: could not change to directory '%s': %s\n", binPath, strerror(GetLastError())); 
-        return 0; // error        
+        printf ("error: could not change to directory '%s'\n", binPath); 
+        return 0; // error
     }
    
     // run the unzip command

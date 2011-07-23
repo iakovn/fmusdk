@@ -17,6 +17,7 @@
  * Revision history
  *  07.02.2010 initial version released in FMU SDK 1.0
  *  05.03.2010 bug fix: removed strerror(GetLastError()) from error messages
+ *  23.07.2011 bug fixes: a number of memory leaks; linux port; command line interface change
  *     
  * Free libraries and tools used to implement this simulator:
  *  - eXpat 2.0.1 XML parser, see http://expat.sourceforge.net
